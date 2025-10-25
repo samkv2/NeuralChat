@@ -1,0 +1,437 @@
+# Ollama Integration Guide for NeuralChat AI Frontend
+
+## Overview
+This guide will help you integrate Ollama (local LLM) with your NeuralChat AI frontend. Ollama allows you to run large language models locally on your machine, providing privacy and offline capabilities.
+
+## Prerequisites
+- Windows 10/11 (or macOS/Linux)
+- At least 8GB RAM (16GB+ recommended)
+- 10GB+ free disk space
+- Modern web browser
+- Basic command line knowledge
+
+## Step 1: Install Ollama
+
+### Windows Installation
+1. **Download Ollama:**
+   - Go to https://ollama.ai/download
+   - Click "Download for Windows"
+   - Run the installer as administrator
+
+2. **Verify Installation:**
+   ```bash
+   ollama --version
+   ```
+
+### Alternative Installation Methods
+```bash
+# Using PowerShell (Windows)
+winget install Ollama.Ollama
+
+# Using Chocolatey
+choco install ollama
+
+# Manual download from GitHub releases
+# Visit: https://github.com/ollama/ollama/releases
+```
+
+## Step 2: Install Your First Model
+
+### Popular Models to Try
+```bash
+# Lightweight models (good for testing)
+ollama pull llama2:7b
+ollama pull mistral:7b
+ollama pull codellama:7b
+
+# Medium models (better quality)
+ollama pull llama2:13b
+ollama pull mistral:7b-instruct
+ollama pull neural-chat:7b
+
+# Large models (best quality, requires more RAM)
+ollama pull llama2:70b
+ollama pull codellama:34b
+```
+
+### Recommended Starting Model
+```bash
+# Start with this - good balance of speed and quality
+ollama pull llama2:7b
+```
+
+## Step 3: Test Ollama API
+
+### Start Ollama Service
+```bash
+# Start Ollama (usually runs automatically after installation)
+ollama serve
+```
+
+### Test API Endpoint
+Open your browser and test the API:
+```
+http://localhost:11434/api/generate
+```
+
+### Test with curl (PowerShell)
+```powershell
+curl -X POST http://localhost:11434/api/generate -H "Content-Type: application/json" -d '{
+  "model": "llama2:7b",
+  "prompt": "Hello, how are you?",
+  "stream": false
+}'
+```
+
+## Step 4: Modify Frontend Code
+
+### Update JavaScript (script.js)
+
+Add this function to handle Ollama API calls:
+
+```javascript
+// Add this function to your script.js file
+async function sendToOllama(message, model = 'llama2:7b') {
+    try {
+        const response = await fetch('http://localhost:11434/api/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: model,
+                prompt: message,
+                stream: false,
+                options: {
+                    temperature: 0.7,
+                    top_p: 0.9,
+                    max_tokens: 1000
+                }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.response;
+    } catch (error) {
+        console.error('Error calling Ollama:', error);
+        return `Sorry, I encountered an error: ${error.message}. Please make sure Ollama is running on localhost:11434`;
+    }
+}
+```
+
+### Update the generateAIResponse function:
+
+```javascript
+// Replace the existing generateAIResponse function with this:
+async function generateAIResponse(userMessage) {
+    const selectedModel = modelSelect.value;
+    
+    if (selectedModel === 'local') {
+        // Use Ollama for local model
+        const response = await sendToOllama(userMessage, 'llama2:7b');
+        typeResponse(response);
+    } else {
+        // Use existing mock responses for other models
+        const responses = getAIResponses(userMessage);
+        const response = responses[Math.floor(Math.random() * responses.length)];
+        typeResponse(response);
+    }
+}
+```
+
+### Update the sendMessage function:
+
+```javascript
+// Update the sendMessage function to handle async responses:
+async function sendMessage() {
+    const message = messageInput.value.trim();
+    if (!message || isTyping) return;
+    
+    // Hide welcome section and show chat
+    if (welcomeSection.style.display !== 'none') {
+        welcomeSection.style.display = 'none';
+        chatMessages.style.display = 'block';
+        chatMessages.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    // Add user message
+    addMessage(message, 'user');
+    
+    // Clear input
+    messageInput.value = '';
+    autoResizeTextarea();
+    
+    // Show typing indicator
+    showTypingIndicator();
+    
+    // Generate AI response (now async)
+    try {
+        await generateAIResponse(message);
+    } catch (error) {
+        hideTypingIndicator();
+        addMessage(`Error: ${error.message}`, 'ai');
+    }
+}
+```
+
+## Step 5: Add Model Management
+
+### Add model switching functionality:
+
+```javascript
+// Add this function to handle different Ollama models
+async function switchOllamaModel(modelName) {
+    try {
+        // Check if model is available
+        const response = await fetch('http://localhost:11434/api/tags');
+        const data = await response.json();
+        const availableModels = data.models.map(m => m.name);
+        
+        if (availableModels.includes(modelName)) {
+            return true;
+        } else {
+            console.log(`Model ${modelName} not found. Available models:`, availableModels);
+            return false;
+        }
+    } catch (error) {
+        console.error('Error checking models:', error);
+        return false;
+    }
+}
+
+// Update model selector change handler
+modelSelect.addEventListener('change', async function() {
+    const selectedModel = this.value;
+    
+    if (selectedModel === 'local') {
+        // Check if Ollama is running
+        try {
+            await fetch('http://localhost:11434/api/tags');
+            updateModelInfo();
+        } catch (error) {
+            alert('Ollama is not running! Please start Ollama service first.');
+            this.value = 'gpt-4'; // Fallback to default
+        }
+    } else {
+        updateModelInfo();
+    }
+});
+```
+
+## Step 6: Add Error Handling
+
+### Add connection status indicator:
+
+```javascript
+// Add this function to check Ollama connection
+async function checkOllamaConnection() {
+    try {
+        const response = await fetch('http://localhost:11434/api/tags', {
+            method: 'GET',
+            timeout: 3000
+        });
+        return response.ok;
+    } catch (error) {
+        return false;
+    }
+}
+
+// Add status indicator to header
+function updateConnectionStatus() {
+    const statusDot = document.querySelector('.status-dot');
+    const statusText = document.querySelector('.status-indicator span');
+    
+    checkOllamaConnection().then(isConnected => {
+        if (isConnected) {
+            statusDot.style.background = 'var(--success-color)';
+            statusText.textContent = 'Ollama Connected';
+        } else {
+            statusDot.style.background = 'var(--error-color)';
+            statusText.textContent = 'Ollama Offline';
+        }
+    });
+}
+
+// Check connection every 30 seconds
+setInterval(updateConnectionStatus, 30000);
+```
+
+## Step 7: Advanced Configuration
+
+### Create ollama-config.js file:
+
+```javascript
+// ollama-config.js - Configuration for Ollama integration
+const OLLAMA_CONFIG = {
+    baseUrl: 'http://localhost:11434',
+    defaultModel: 'llama2:7b',
+    timeout: 30000,
+    retryAttempts: 3,
+    models: {
+        'llama2:7b': { name: 'Llama 2 7B', description: 'Fast and efficient' },
+        'mistral:7b': { name: 'Mistral 7B', description: 'Great for coding' },
+        'codellama:7b': { name: 'Code Llama 7B', description: 'Specialized for code' },
+        'neural-chat:7b': { name: 'Neural Chat 7B', description: 'Conversational AI' }
+    }
+};
+
+// Export for use in main script
+window.OLLAMA_CONFIG = OLLAMA_CONFIG;
+```
+
+### Include the config in your HTML:
+
+```html
+<!-- Add this before script.js in your index.html -->
+<script src="ollama-config.js"></script>
+<script src="script.js"></script>
+```
+
+## Step 8: Performance Optimization
+
+### Add response streaming (optional):
+
+```javascript
+// For streaming responses (more responsive)
+async function sendToOllamaStream(message, model = 'llama2:7b') {
+    try {
+        const response = await fetch('http://localhost:11434/api/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: model,
+                prompt: message,
+                stream: true
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullResponse = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+                if (line.trim()) {
+                    try {
+                        const data = JSON.parse(line);
+                        if (data.response) {
+                            fullResponse += data.response;
+                            // Update UI with streaming response
+                            updateStreamingResponse(fullResponse);
+                        }
+                    } catch (e) {
+                        // Skip invalid JSON lines
+                    }
+                }
+            }
+        }
+
+        return fullResponse;
+    } catch (error) {
+        console.error('Error calling Ollama:', error);
+        return `Sorry, I encountered an error: ${error.message}`;
+    }
+}
+```
+
+## Step 9: Testing Your Integration
+
+### Test Checklist:
+- [ ] Ollama service is running
+- [ ] Model is downloaded and available
+- [ ] Frontend connects to Ollama API
+- [ ] Messages are sent and received
+- [ ] Error handling works
+- [ ] Model switching works
+- [ ] Connection status updates correctly
+
+### Test Commands:
+```bash
+# Check if Ollama is running
+curl http://localhost:11434/api/tags
+
+# Test a simple generation
+curl -X POST http://localhost:11434/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"model": "llama2:7b", "prompt": "Hello!", "stream": false}'
+```
+
+## Step 10: Troubleshooting
+
+### Common Issues:
+
+1. **"Connection refused" error:**
+   - Make sure Ollama is running: `ollama serve`
+   - Check if port 11434 is available
+   - Try restarting Ollama service
+
+2. **"Model not found" error:**
+   - List available models: `ollama list`
+   - Pull the model: `ollama pull llama2:7b`
+
+3. **Slow responses:**
+   - Use smaller models (7B instead of 13B/70B)
+   - Close other applications to free up RAM
+   - Consider using GPU acceleration
+
+4. **CORS errors:**
+   - Ollama should handle CORS automatically
+   - If issues persist, check browser console
+
+### Performance Tips:
+- Start with 7B models for faster responses
+- Use `stream: true` for better user experience
+- Monitor RAM usage (models can use 4-8GB+ RAM)
+- Consider using quantized models for better performance
+
+## Step 11: Production Deployment
+
+### For Production Use:
+1. **Security:** Add authentication if needed
+2. **Scaling:** Consider Ollama server deployment
+3. **Monitoring:** Add logging and error tracking
+4. **Backup:** Regular model and configuration backups
+
+### Environment Variables:
+```bash
+# Set custom Ollama URL
+export OLLAMA_HOST=0.0.0.0:11434
+
+# Set model directory
+export OLLAMA_MODELS=/path/to/models
+```
+
+## Additional Resources
+
+- **Ollama Documentation:** https://ollama.ai/docs
+- **Model Library:** https://ollama.ai/library
+- **GitHub Repository:** https://github.com/ollama/ollama
+- **Community:** https://github.com/ollama/ollama/discussions
+
+## Support
+
+If you encounter issues:
+1. Check Ollama logs: `ollama logs`
+2. Restart Ollama service
+3. Check available models: `ollama list`
+4. Verify API endpoint: `curl http://localhost:11434/api/tags`
+
+---
+
+**Happy coding with your local AI! 🤖✨**

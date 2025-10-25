@@ -1,0 +1,27 @@
+# NeuralChat AI - Local LLM Chat Interface
+
+A modern, responsive web-based chat interface for local Large Language Models (LLMs) powered by Ollama. Features a sleek glassmorphism design with neural network animations and real-time AI conversations.
+
+## Key Features
+
+- **Local LLM Integration**: Seamlessly connects to Ollama for private, offline AI conversations
+- **Modern UI/UX**: Glassmorphism design with neural network background animations  
+- **Real-time Chat**: Live typing indicators and smooth message animations
+- **Model Management**: Dynamic model detection and switching between different LLMs
+- **Responsive Design**: Optimized for desktop, tablet, and mobile devices
+- **Privacy-First**: All conversations happen locally on your machine
+
+## Tech Stack
+
+- **Frontend**: HTML5, CSS3, Vanilla JavaScript
+- **AI Backend**: Ollama (Local LLM Runtime)
+- **Design**: Glassmorphism, CSS Grid/Flexbox, CSS Animations
+- **Architecture**: Client-side SPA with RESTful API integration
+
+## Quick Start
+
+1. Install Ollama and pull a model: `ollama pull mistral:7b-instruct`
+2. Start local server: `python -m http.server 8000`
+3. Open `http://localhost:8000` and start chatting!
+
+Perfect for developers who want a beautiful, private AI chat interface running entirely on their local machine.

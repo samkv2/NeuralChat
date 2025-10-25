@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ollama Connection Test</title>
+</head>
+<body>
+    <h1>Ollama Connection Test</h1>
+    <button onclick="testConnection()">Test Ollama Connection</button>
+    <div id="result"></div>
+
+    <script>
+        async function testConnection() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                console.log('Testing Ollama connection...');
+                const response = await fetch('http://localhost:11434/api/tags', {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Models:', data);
+                    resultDiv.innerHTML = `
+                        <h2>✅ Connection Successful!</h2>
+                        <p>Status: ${response.status}</p>
+                        <h3>Available Models:</h3>
+                        <ul>
+                            ${data.models.map(model => `<li>${model.name}</li>`).join('')}
+                        </ul>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<h2>❌ Connection Failed</h2><p>Status: ${response.status}</p>`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `<h2>❌ Error</h2><p>${error.message}</p>`;
+            }
+        }
+        
+        // Auto-test on load
+        window.onload = testConnection;
+    </script>
+</body>
+</html>
