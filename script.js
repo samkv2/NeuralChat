@@ -40,6 +40,16 @@ document.addEventListener('DOMContentLoaded', function() {
         // New chat button
         newChatBtn.addEventListener('click', startNewChat);
         
+        // Refresh Ollama connection button
+        const refreshBtn = document.getElementById('refreshBtn');
+        refreshBtn.addEventListener('click', () => {
+            refreshBtn.style.transform = 'rotate(360deg)';
+            setTimeout(() => {
+                refreshBtn.style.transform = 'rotate(0deg)';
+            }, 500);
+            checkOllamaConnection();
+        });
+        
     // Model selector change
     modelSelect.addEventListener('change', async function() {
         const selectedModel = this.value;
@@ -90,13 +100,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check Ollama connection status and load available models
     async function checkOllamaConnection() {
         try {
+            console.log('🔍 Checking Ollama connection...');
             const response = await fetch('http://localhost:11434/api/tags', {
                 method: 'GET',
-                timeout: 3000
+                mode: 'cors',
+                headers: {
+                    'Accept': 'application/json',
+                }
             });
+            
+            console.log('📡 Response status:', response.status);
             
             if (response.ok) {
                 const data = await response.json();
+                console.log('📋 Raw API response:', data);
+                
                 const statusDot = document.querySelector('.status-dot');
                 const statusText = document.querySelector('.status-indicator span');
                 
@@ -109,16 +127,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('✅ Ollama is running and connected!');
                 console.log('📋 Available models:', data.models.map(m => m.name));
             } else {
-                throw new Error('Ollama not responding');
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
         } catch (error) {
+            console.error('❌ Ollama connection error:', error);
+            
             const statusDot = document.querySelector('.status-dot');
             const statusText = document.querySelector('.status-indicator span');
             
             statusDot.style.background = 'var(--error-color)';
             statusText.textContent = 'Ollama Offline';
             
-            console.log('❌ Ollama is not running. Please start it with: ollama serve');
+            console.log('❌ Ollama connection failed. Error:', error.message);
+            console.log('💡 Make sure Ollama is running: ollama serve');
         }
     }
     
@@ -193,12 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showTypingIndicator();
         
         // Generate AI response (now async)
-        try {
-            await generateAIResponse(message);
-        } catch (error) {
-            hideTypingIndicator();
-            addMessage(`Error: ${error.message}`, 'ai');
-        }
+        await generateAIResponse(message);
     }
     
     function addMessage(content, sender) {
@@ -244,10 +260,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Ollama API integration
     async function sendToOllama(message, model = 'mistral:7b-instruct') {
         try {
+            console.log(`🤖 Sending to Ollama model: ${model}`);
+            console.log(`📝 Message: ${message}`);
+            
             const response = await fetch('http://localhost:11434/api/generate', {
                 method: 'POST',
+                mode: 'cors',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                 },
                 body: JSON.stringify({
                     model: model,
@@ -261,14 +282,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
             });
 
+            console.log('📡 Ollama response status:', response.status);
+
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                console.error('❌ Ollama API error:', errorText);
+                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
             }
 
             const data = await response.json();
+            console.log('✅ Ollama response received:', data);
             return data.response;
         } catch (error) {
-            console.error('Error calling Ollama:', error);
+            console.error('❌ Error calling Ollama:', error);
             return `Sorry, I encountered an error: ${error.message}. Please make sure Ollama is running on localhost:11434`;
         }
     }
@@ -276,16 +302,23 @@ document.addEventListener('DOMContentLoaded', function() {
     async function generateAIResponse(userMessage) {
         const selectedModel = modelSelect.value;
         
-        // Check if it's an Ollama model (contains colon or starts with specific patterns)
-        if (selectedModel.includes(':') || selectedModel.includes('mistral') || selectedModel.includes('llama') || selectedModel.includes('codellama')) {
-            // Use Ollama for local model
-            const response = await sendToOllama(userMessage, selectedModel);
-            typeResponse(response);
-        } else {
-            // Use existing mock responses for cloud models
-            const responses = getAIResponses(userMessage);
-            const response = responses[Math.floor(Math.random() * responses.length)];
-            typeResponse(response);
+        try {
+            // Check if it's an Ollama model (contains colon or starts with specific patterns)
+            if (selectedModel.includes(':') || selectedModel.includes('mistral') || selectedModel.includes('llama') || selectedModel.includes('codellama')) {
+                // Use Ollama for local model
+                const response = await sendToOllama(userMessage, selectedModel);
+                hideTypingIndicator(); // Hide typing indicator before showing response
+                typeResponse(response);
+            } else {
+                // Use existing mock responses for cloud models
+                const responses = getAIResponses(userMessage);
+                const response = responses[Math.floor(Math.random() * responses.length)];
+                hideTypingIndicator(); // Hide typing indicator before showing response
+                typeResponse(response);
+            }
+        } catch (error) {
+            hideTypingIndicator(); // Hide typing indicator on error
+            addMessage(`Error: ${error.message}`, 'ai');
         }
     }
     
