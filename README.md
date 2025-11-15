@@ -78,12 +78,6 @@ The application automatically detects available Ollama models and populates the 
 - Chrome 80+
 - Firefox 75+
 - Safari 13+
-- Edge 80+
-
-## 📝 License
-
-MIT License - Feel free to use, modify, and distribute.
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
